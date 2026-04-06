@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -32,6 +32,24 @@ interface MainContentProps {
 
 export function MainContent({ user, project }: MainContentProps) {
   const [activeView, setActiveView] = useState<"preview" | "code">("preview");
+  const [iframeHasFocus, setIframeHasFocus] = useState(false);
+
+  // Track when the preview iframe steals window focus so the toggle buttons
+  // still respond on the first click (iframe focus-stealing browser behavior).
+  useEffect(() => {
+    const handleBlur = () => {
+      if (activeView === "preview") {
+        setIframeHasFocus(true);
+      }
+    };
+    const handleFocus = () => setIframeHasFocus(false);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [activeView]);
 
   return (
     <FileSystemProvider initialData={project?.data}>
@@ -67,8 +85,8 @@ export function MainContent({ user, project }: MainContentProps) {
                     }
                   >
                     <TabsList className="bg-white/60 border border-neutral-200/60 p-0.5 h-9 shadow-sm">
-                      <TabsTrigger value="preview" className="data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-sm text-neutral-600 px-4 py-1.5 text-sm font-medium transition-all">Preview</TabsTrigger>
-                      <TabsTrigger value="code" className="data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-sm text-neutral-600 px-4 py-1.5 text-sm font-medium transition-all">Code</TabsTrigger>
+                      <TabsTrigger value="preview" onPointerDown={() => setActiveView("preview")} className="data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-sm text-neutral-600 px-4 py-1.5 text-sm font-medium transition-all">Preview</TabsTrigger>
+                      <TabsTrigger value="code" onPointerDown={() => setActiveView("code")} className="data-[state=active]:bg-white data-[state=active]:text-neutral-900 data-[state=active]:shadow-sm text-neutral-600 px-4 py-1.5 text-sm font-medium transition-all">Code</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   <HeaderActions user={user} projectId={project?.id} />
@@ -77,8 +95,14 @@ export function MainContent({ user, project }: MainContentProps) {
                 {/* Content Area */}
                 <div className="flex-1 overflow-hidden bg-neutral-50">
                   {activeView === "preview" ? (
-                    <div className="h-full bg-white">
+                    <div className="h-full bg-white relative">
                       <PreviewFrame />
+                      {iframeHasFocus && (
+                        <div
+                          className="absolute inset-0 z-10"
+                          onPointerDown={() => setIframeHasFocus(false)}
+                        />
+                      )}
                     </div>
                   ) : (
                     <ResizablePanelGroup
